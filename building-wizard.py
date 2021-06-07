@@ -42,13 +42,33 @@ def yes_or_no(question):
                 return False
             else:
                 print("Whoops - please enter 'y' or 'n'.")
+                
+# Quick function to error-catch non-standard y/n responses
+def yes_or_no_unsure(question):
+    while True:
+        reply = str(input(question+' (y/n/u): ')).lower().strip()
+        if reply != "":
+            if reply[0] == 'y':
+                return 1
+            if reply[0] == 'n':
+                return 0
+            if reply[0] == 'u':
+                return 2
+            else:
+                print("Whoops - please enter 'y' , 'n' or 'u'.")                
 
 #%%
           
 screen_clear="\033[H\033[J"
 
 print(screen_clear)
-print("WELCOME TO CLIMATEDATA.CA's INTERACTIVE BUILDING SECTOR CLIMATE DECISION SUPPORT TOOL")
+draw_stuff("BVAT")
+print ("\nREADY PLAYER ONE")
+input("\nPress Enter to Begin...")
+
+
+print(screen_clear)
+print("WELCOME TO CLIMATEDATA.CA's INTERACTIVE VULNERABILITY ASSESSMENT TOOL FOR BUILDINGS")
 print("\n")
 print("This interactive tool is designed for engineers, architects, planners, and other professionals in the buildings sector.\n")
 print("\nThe tool has two main goals:\n")
@@ -259,7 +279,8 @@ with open('master_hazard_database.json', 'r') as j:
     master_hazard_dict = json.load(j)
 
 print("\n")
-do_vulnerability_ranking = yes_or_no("As part of this step, would you like to consider the relative level of vulnerability each building component has for each hazard, on a 'quick and dirty' 1-10 scale (1=trivially; 10=extremely)?  While this might make this exercise a few minutes longer, it will help me prioritize what climate information may be most important for you.")
+#hard coding this option for now
+do_vulnerability_ranking = True #yes_or_no("As part of this step, would you like to consider the relative level of vulnerability each building component has for each hazard, on a 'quick and dirty' 1-10 scale (1=trivially; 10=extremely)?  While this might make this exercise a few minutes longer, it will help me prioritize what climate information may be most important for you.")
 
 #Dynamically generate a customized hazard_dict based on user prompts.
 
@@ -272,27 +293,60 @@ def provide_number(query,lower,upper):
             print("     Whoops - please enter a number between "+str(lower)+"-"+str(upper)+".")
 
 def update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking):
-            print("Which of your building's components are vulnerable now (or may be in future) to "+h.upper()+"?\n")
             for component in building_component_dict.keys():
-                if yes_or_no(component.upper()+"->") is True:
+                if yes_or_no(("Would your " + building_type.upper() + "'s " + component.upper()+ " be damaged during " +h.upper()+ " events? ->")) is True:
                     building_component_dict[component]["hazards"][h] = np.nan
                     if do_vulnerability_ranking:
-                        building_component_dict[component]["hazards"][h] = provide_number("     How vulnerable (1-10)?",1,10)
+                        building_component_dict[component]["hazards"][h] = provide_number("From 1 (slight) to 10 (complete collapse/loss), rank potential damage to "+component+" caused by "+h.upper()+" -> (1-10):",1,10)
             return building_component_dict
                 
 
 for h in master_hazard_dict.keys():
     if h != "other":
         print(screen_clear)
+        his_freq=0
+        fut_freq=0
         #draw_stuff(h)
         print(h.upper())
         print("---------------------------------------------------------------------------")
         print("\n"+master_hazard_dict[h]["impact_statement"])
         print("\n"+master_hazard_dict[h]["direction_statement"])
         print("---------------------------------------------------------------------------")
-        if yes_or_no("Considering your region's and building's possible vulnerabilities to "+h.upper()+" now or potentially in the future, do you want me to include "+h.upper()+" in this assessment?\n"):
+        his_question = yes_or_no_unsure("Histrically, is your " + building_type.upper() + " exposed to potentially damaging " + h.upper() + " events? (Y=yes, N=no, U=unsure)")
+        if his_question != 0:
+            if his_question == 2:
+                his_freq=0
+                print("\nThat's okay if you don't know. Let's assume the answer is yes for now, and we can come back to this later.")
+            if his_question == 1:
+                print("\nBased on your experience, approximately how often does a potentially damaging " + h.upper() + " event occur?")
+                print("1. multiple times per year")
+                print("2. once per year")
+                print("3. once every 2 to 5 years")
+                print("4. once every 5 to 10 years")
+                print("5. less than once every 10 years")
+                his_freq=input("Enter a number from 1 to 5 >")
+            fut_freq=yes_or_no_unsure("\nDo you expect damaging " + h.upper() + " events will become MORE frequent as the climate continues to change? (Y=yes, N=no, U=unsure") 
+            if fut_freq ==2:
+                print("\nThat's okay if you don't know the answer right now. I'll make a note, and we can come back to this later. For now, let's assume this hazard will become and/or remain an issue in the future.")
+            print("\nI need to understand how this hazard can potentially damage your "+building_type.upper()+".")
             hazard_dict[h]=master_hazard_dict[h]
-            building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)
+            building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)   
+            hazard_dict[h]["his_freq"]=his_freq
+            hazard_dict[h]["fut_freq"]=fut_freq
+        else:
+            emerging=yes_or_no_unsure("\nWhat about in the future? Do you think your "+building_type+" could experience "+h.upper() + " events because of climate change or other factors? (Y=yes, N=no, U=unsure)")
+            his_freq=999  #code to note that this hazard does occur historically
+            if emerging != 0:
+                if emerging == 2:
+                    print ("\nThat's fair enough. I'll include this hazard for now, but it sounds like we need to do some more background research to learn more about how "+h.upper()+" events may become an emerging issues in the future.")
+                    fut_freq=2
+                print("\nI need to understand how this hazard can potentially damage your "+building_type+".")
+                hazard_dict[h]=master_hazard_dict[h]
+                building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)
+                hazard_dict[h]["his_freq"]=his_freq
+                hazard_dict[h]["fut_freq"]=fut_freq
+                    
+            
     else:
         print(screen_clear)
         print("ANYTHING I FORGOT?")
@@ -306,6 +360,48 @@ for h in master_hazard_dict.keys():
             else:
                 break
 print(screen_clear)
+
+#%%
+#REVISIT ITEMS THE USER INDICATED THEY WERE UNSURE ABOUT...
+urls=[]
+for h in hazard_dict:
+    if hazard_dict[h]["his_freq"]==0 or hazard_dict[h]["fut_freq"]==2:  #confusingly, a his_freq value of 0 mean "unsure" and a fut_freq value of 2 means "unsure"... gotta fix later
+        if hazard_dict[h]["his_freq"]==0:
+            print("You indicated earlier that you were unsure if your "+building_type.upper()+" is HISTORICALLY exposed to periodic "+h.upper()+" events.")
+        if hazard_dict[h]["fut_freq"]==2:
+            print("You indicated earlier that you were unsure if "+ h.upper() + " events are projected to become more or less frequent in the FUTURE.")
+        if h.upper != "OTHER":
+            print("\nHere's some context for considering shifts in "+h.upper()+" due to climate change\n")
+            print(hazard_dict[h]["direction_statement"])
+            print(hazard_dict[h]["direction_confidence"])
+            print(hazard_dict[h]["magnitude_confidence"])
+            print("\nIn light of this context, here are some resources that I think could help you develop better understanding of changes to "+h.upper()+" impacts to your "+building_type.upper()+":")
+        if hazard_dict[h]["resources"]: #if there is actually a dictionary of resources available, proceed -
+            for resource,resource_details in hazard_dict[h]["resources"].items():
+                print("\n")
+                print("    --->Resource: "+resource.upper()+"<---")
+                print("    Information on "+h.upper()+" is available from "+resource_details["source"]+".")
+                print("    This "+resource_details["type"]+" "+resource_details["description"])
+                if resource_details["source"]=="ClimateData.ca":
+                    if yes_or_no("    Would you like me to open a map in your web browser, where you can access data for your location for different future scenarios?"):
+                        urls.append(resource_details["URL"]+str(latitude)+","+str(longitude)+",12&geo-select=&var="+resource_details["var"]+"&var-group="+resource_details["group"]+"&mora="+resource_details["season"]+"&rcp=rcp85&decade="+str(decade)+"s&sector=")
+                elif resource_details["source"]=="The Climate Resilient Buildings and Core Public Infrastructure Project":
+                    location=CRBCPI_data["+0.5C"]["Location"][np.squeeze(CRBCPI_i)]
+                    proximity="{x:.0f}".format(x=np.squeeze(CRBCPI_distance)*6378.) # convert distance from radians to kilometers, format for rounded-value printing
+                    print("    In addition to regional information, it appears there is data available for "+location +", around "+proximity+" km away from your  site.")
+                    if yes_or_no("    Would you like me to open the CRBCPI report section on "+resource+", where you can read more about how to use this information?"):
+                        urls.append(resource_details["URL"])
+                else:
+                    if yes_or_no("    Would you like me to open a website where you can read more about this?"):
+                        urls.append(resource_details["URL"])
+        else:
+            print("    Sorry, I don't have any information for: "+h.upper()+" quite yet.  Please give the CCCS Service Desk a call (1-833-517-0376) to request some one-on-one help!")
+            if yes_or_no("    Would you like me to open the CCCS Service Desk website?"):   
+                urls.append("https://climate-change.canada.ca/support-desk/Index")
+        print(" \n")
+
+for url in set(urls): #Open all urls collected from above.  'set' trims this list down to unique urls.
+    webbrowser.open(url,new=0,autoraise=False)
 
 # %% 
 
@@ -356,7 +452,7 @@ if do_vulnerability_ranking:
 l_sorted=aggregate_hazard_list.most_common()
 
 max_len=min(3,len(l_sorted))
-print("Based on these lists, the top climate hazards that impact the most components of building appear to be:\n")
+print("\nBased on these lists, the top climate hazards that impact the most components of building appear to be:\n")
 for h in range(max_len):
     print("->"+l_sorted[h][0])
 print("\nIt might make sense to focus most on these hazards during data gathering for your building planning work.\n")
@@ -365,7 +461,7 @@ input ("Press ENTER to continue")
 print(screen_clear)
 
 # %%
-
+'''
 print("I've found some specific climate information and data resources that are likely to help you, based on the hazards that are important for your building.\n")
 urls=[]
 for hazard,_ in l_sorted:
@@ -405,7 +501,7 @@ for url in set(urls): #Open all urls collected from above.  'set' trims this lis
     webbrowser.open(url,new=0,autoraise=False)
       
 #TODO: Improve this closing guidance.
-
+'''
 # %%
 
 input("Press ENTER to continue")
