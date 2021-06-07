@@ -366,6 +366,7 @@ print(screen_clear)
 urls=[]
 for h in hazard_dict:
     if hazard_dict[h]["his_freq"]==0 or hazard_dict[h]["fut_freq"]==2:  #confusingly, a his_freq value of 0 mean "unsure" and a fut_freq value of 2 means "unsure"... gotta fix later
+        print(screen_clear)
         if hazard_dict[h]["his_freq"]==0:
             print("You indicated earlier that you were unsure if your "+building_type.upper()+" is HISTORICALLY exposed to periodic "+h.upper()+" events.")
         if hazard_dict[h]["fut_freq"]==2:
