@@ -43,7 +43,7 @@ def yes_or_no(question):
             else:
                 print("Whoops - please enter 'y' or 'n'.")
                 
-# Quick function to error-catch non-standard y/n responses
+# Quick function to error-catch non-standard y/n/u responses
 def yes_or_no_unsure(question):
     while True:
         reply = str(input(question+' (y/n/u): ')).lower().strip()
@@ -324,7 +324,7 @@ for h in master_hazard_dict.keys():
                 print("3. once every 2 to 5 years")
                 print("4. once every 5 to 10 years")
                 print("5. less than once every 10 years")
-                his_freq=input("Enter a number from 1 to 5 >")
+                his_freq=provide_number("Enter a number from 1 to 5 >",1,5)
             fut_freq=yes_or_no_unsure("\nDo you expect damaging " + h.upper() + " events will become MORE frequent as the climate continues to change? (Y=yes, N=no, U=unsure") 
             if fut_freq ==2:
                 print("\nThat's okay if you don't know the answer right now. I'll make a note, and we can come back to this later. For now, let's assume this hazard will become and/or remain an issue in the future.")
@@ -411,8 +411,8 @@ print("\n")
 print("STEP 4: SUMMARY REPORT")
 print("\n")
 
-print("GOOD JOB!  IN CONSIDERING POTENTIAL CLIMATE HAZARDS FOR EACH COMPONENT OF YOUR BUILDING, YOU HAVE STARTED ON YOUR WAY TO INTEGRATE CLIMATE CHANGE CONSIDERATIONS INTO BUILDING PLANNING!\n")
-print("LET ME SUMMARIZE YOUR RESULTS, AND TRY TO POINT YOU TO SOME POTENTIAL SOURCES OF GOOD PAST AND FUTURE CLIMATE INFORMATION THAT IS RELEVANT TO YOUR BUILDING!\n")
+print("IN CONSIDERING POTENTIAL CLIMATE HAZARDS FOR EACH COMPONENT OF YOUR BUILDING, YOU HAVE STARTED ON YOUR WAY TO INTEGRATE CLIMATE CHANGE CONSIDERATIONS INTO BUILDING PLANNING.\n")
+print("LET ME SUMMARIZE YOUR RESULTS, AND TRY TO POINT YOU TO SOME POTENTIAL SOURCES OF GOOD PAST AND FUTURE CLIMATE INFORMATION THAT IS RELEVANT TO YOUR BUILDING,\n")
 
 sep="\n->"
 
@@ -431,8 +431,61 @@ if do_vulnerability_ranking:
     for component in building_component_dict:
         ranks.append(building_component_dict[component]["total_hazard_sum"])
     sortrank=sorted(ranks, reverse=True)
+    
+    j = 0
     print("\n")
-    print("\nBased on your entries, I have tried to rank your building's components from MOST to LEAST vulnerable:\n")
+    print("Frist, this is what I heard from you in regards to historical and future weather hazards in your region:\n")
+    for h in hazard_dict:
+        j+=1
+        summary_statement=""
+        components_impacted = ""
+        #historical statement
+        if hazard_dict[h]["his_freq"] != 0:
+            if hazard_dict[h]["his_freq"] == 1: 
+                his_choice ="frequenly, potentially multiple times per year"
+            elif hazard_dict[h]["his_freq"] == 2:
+                his_choice="frequently, approximatley once per year"
+            elif hazard_dict[h]["his_freq"] == 3:
+                his_choice="roughly once every 2 to 5 years"
+            elif hazard_dict[h]["his_freq"] == 4:
+                his_choice="relatively infrequently, roughly once every 5 to 10 years"
+            elif hazard_dict[h]["his_freq"] == 5:
+                his_choice="infrequently, less than once every 10 years"
+            summary_statement+=(str(j) + ". Based on your experience, " + h.upper() + " events occur " + his_choice + ".")
+        elif hazard_dict[h]["his_freq"] == 0:
+            summary_statement+=(str(j) + ". You indicated your were unsure if " + h.upper() + " occurs historically in your region. I hope the resources I supplied you with helped." )
+        #future statement
+        if hazard_dict[h]["fut_freq"] == 0:
+            summary_statement+=(" You indicated too that, based on what you've read or heard, " + h.upper() + " events are not likely to occur more frequently in the future.")
+        elif hazard_dict[h]["fut_freq"] == 1:
+            summary_statement+=(" Importantly, you indicated too that " + h.upper() + " events are likely to occur more frequenlty in the coming decades due to climate change.")
+        elif hazard_dict[h]["fut_freq"] ==2:
+            summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped, but its all too often that we don't have all the answers about future hazards. Don't let this stop you.")
+
+        #sloppy, I know... pre-loop thorugh the dict to simply count the number of matching items. So I can do grammar below...
+        c=0        
+        for component,per_component_hazard_dict in building_component_dict.items():
+            for rankval in per_component_hazard_dict["hazards"].items():
+                if rankval[0]==h:
+                    c=c+1
+        cc=0
+        for component,per_component_hazard_dict in building_component_dict.items():
+            for rankval in per_component_hazard_dict["hazards"].items():
+                if rankval[0]==h:
+                    cc=cc+1
+                    if cc < c:
+                        components_impacted += component + ", "    
+                    else:
+                        components_impacted += "and " + component
+                    
+        if components_impacted == "":
+            summary_statement+= (" I thought it was interesting to note that " + h.upper() + " events do not seem to impact your " + building_type.upper()+"'s components.")
+        else:
+            summary_statement+=(" Importantly, " + h.upper() + " events can potentially impact your " + building_type.upper()+ " by damaging " + components_impacted + ".")
+
+        print("\n"+summary_statement)
+        
+    print("\nNext, based on your entries, I have tried to rank your building's components from MOST to LEAST vulnerable:\n")
     j = 0
     for i in range(len(sortrank)):
         if i+j < len(sortrank):
@@ -453,7 +506,7 @@ if do_vulnerability_ranking:
 l_sorted=aggregate_hazard_list.most_common()
 
 max_len=min(3,len(l_sorted))
-print("\nBased on these lists, the top climate hazards that impact the most components of building appear to be:\n")
+print("\nFinally, the top climate hazards that impact the most components of building appear to be:\n")
 for h in range(max_len):
     print("->"+l_sorted[h][0])
 print("\nIt might make sense to focus most on these hazards during data gathering for your building planning work.\n")

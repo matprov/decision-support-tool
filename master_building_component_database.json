@@ -8,7 +8,7 @@
    "SHELL":{
       "sentence_start":"a",
       "description":"Includes superstructure, exterior closures, and roofing",
-      "group":["superstructure (floor and roof)","exterior closures (exterior wall, windows, doors)","roofing (coverings and openings"],
+      "group":["superstructure (floor and roof)","exterior closures (exterior wall, windows, doors)","roofing (coverings and openings)"],
       "possible_hazards":[]
       },
    "INTERIORS":{
