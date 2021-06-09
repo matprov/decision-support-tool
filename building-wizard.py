@@ -299,6 +299,35 @@ def update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_
                     if do_vulnerability_ranking:
                         building_component_dict[component]["hazards"][h] = provide_number("From 1 (slight) to 10 (complete collapse/loss), rank potential damage to "+component+" caused by "+h.upper()+" -> (1-10):",1,10)
             return building_component_dict
+        
+def resource_help(h, hazard_dict):
+    print("\nOkay thanks for telling me that you were unsure. I have some resources that might help. Take a look, then I'll ask the question again.\n")
+    if hazard_dict[h]["resources"]: #if there is actually a dictionary of resources available, proceed -
+        for resource,resource_details in hazard_dict[h]["resources"].items():
+            print("\n")
+            print("    --->Resource: "+resource.upper()+"<---")
+            print("    Information on "+h.upper()+" is available from "+resource_details["source"]+".")
+            print("    This "+resource_details["type"]+" "+resource_details["description"])
+            if resource_details["source"]=="ClimateData.ca":
+                if yes_or_no("    Would you like me to open a map in your web browser, where you can access data for your location for different future scenarios?"):
+                    url=(resource_details["URL"]+str(latitude)+","+str(longitude)+",12&geo-select=&var="+resource_details["var"]+"&var-group="+resource_details["group"]+"&mora="+resource_details["season"]+"&rcp=rcp85&decade="+str(decade)+"s&sector=")
+                    webbrowser.open(url,new=0,autoraise=False)
+            elif resource_details["source"]=="The Climate Resilient Buildings and Core Public Infrastructure Project":
+                location=CRBCPI_data["+0.5C"]["Location"][np.squeeze(CRBCPI_i)]
+                proximity="{x:.0f}".format(x=np.squeeze(CRBCPI_distance)*6378.) # convert distance from radians to kilometers, format for rounded-value printing
+                print("    In addition to regional information, it appears there is data available for "+location +", around "+proximity+" km away from your  site.")
+                if yes_or_no("    Would you like me to open the CRBCPI report section on "+resource+", where you can read more about how to use this information?"):
+                    url=(resource_details["URL"])
+                    webbrowser.open(url,new=0,autoraise=False)
+            else:
+                if yes_or_no("    Would you like me to open a website where you can read more about this?"):
+                    url=(resource_details["URL"])
+                    webbrowser.open(url,new=0,autoraise=False)
+    else:
+        print("    Sorry, I don't have any information for: "+h.upper()+" quite yet.  Please give the CCCS Service Desk a call (1-833-517-0376) to request some one-on-one help!")
+        if yes_or_no("    Would you like me to open the CCCS Service Desk website?"):   
+            url=("https://climate-change.canada.ca/support-desk/Index")
+            webbrowser.open(url,new=0,autoraise=False)
                 
 
 for h in master_hazard_dict.keys():
@@ -306,6 +335,8 @@ for h in master_hazard_dict.keys():
         print(screen_clear)
         his_freq=0
         fut_freq=0
+        his_unsure=0
+        fut_unsure=0
         #draw_stuff(h)
         print(h.upper())
         print("---------------------------------------------------------------------------")
@@ -314,9 +345,15 @@ for h in master_hazard_dict.keys():
         print("---------------------------------------------------------------------------")
         his_question = yes_or_no_unsure("Histrically, is your " + building_type.upper() + " exposed to potentially damaging " + h.upper() + " events? (Y=yes, N=no, U=unsure)")
         if his_question != 0:
-            if his_question == 2:
+            hazard_dict[h]=master_hazard_dict[h]
+            while his_question == 2:
                 his_freq=0
-                print("\nThat's okay if you don't know. Let's assume the answer is yes for now, and we can come back to this later.")
+                resource_help(h, hazard_dict)
+                his_question = yes_or_no_unsure("So, what do you think now? Histrically, is your " + building_type.upper() + " exposed to potentially damaging " + h.upper() + " events? (Y=yes, N=no, U=unsure)")
+                if his_question == 2:
+                    print("\nThat's okay if still you don't know. Let's assume the answer is yes for now, and we can come back to this later.")
+                    his_question = 1
+                    his_unsure = 1
             if his_question == 1:
                 print("\nBased on your experience, approximately how often does a potentially damaging " + h.upper() + " event occur?")
                 print("1. multiple times per year")
@@ -325,27 +362,53 @@ for h in master_hazard_dict.keys():
                 print("4. once every 5 to 10 years")
                 print("5. less than once every 10 years")
                 his_freq=provide_number("Enter a number from 1 to 5 >",1,5)
-            fut_freq=yes_or_no_unsure("\nDo you expect damaging " + h.upper() + " events will become MORE frequent as the climate continues to change? (Y=yes, N=no, U=unsure") 
-            if fut_freq ==2:
-                print("\nThat's okay if you don't know the answer right now. I'll make a note, and we can come back to this later. For now, let's assume this hazard will become and/or remain an issue in the future.")
-            print("\nI need to understand how this hazard can potentially damage your "+building_type.upper()+".")
-            hazard_dict[h]=master_hazard_dict[h]
-            building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)   
-            hazard_dict[h]["his_freq"]=his_freq
-            hazard_dict[h]["fut_freq"]=fut_freq
-        else:
-            emerging=yes_or_no_unsure("\nWhat about in the future? Do you think your "+building_type+" could experience "+h.upper() + " events because of climate change or other factors? (Y=yes, N=no, U=unsure)")
-            his_freq=999  #code to note that this hazard does occur historically
-            if emerging != 0:
-                if emerging == 2:
-                    print ("\nThat's fair enough. I'll include this hazard for now, but it sounds like we need to do some more background research to learn more about how "+h.upper()+" events may become an emerging issues in the future.")
-                    fut_freq=2
-                print("\nI need to understand how this hazard can potentially damage your "+building_type+".")
-                hazard_dict[h]=master_hazard_dict[h]
-                building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)
+                fut_quest="\nDo you expect damaging " + h.upper() + " events will become MORE frequent as the climate continues to change? (Y=yes, N=no, U=unsure"
+                fut_freq=yes_or_no_unsure(fut_quest) 
+            else:
+                his_freq=999 #code to note that this hazard does occur historically
+                fut_quest="\nWhat about in the future? Do you think your "+building_type+" could experience "+h.upper() + " events because of climate change or other factors? (Y=yes, N=no, U=unsure)"
+                fut_freq=yes_or_no_unsure(fut_quest)
+            while fut_freq ==2:
+                resource_help(h, hazard_dict)
+                fut_freq=yes_or_no_unsure("I'll aks my question one more time: " + fut_quest)
+                if fut_freq == 2:
+                    fut_freq=1
+                    fut_unsure=1
+                    print("\nThat's okay if you still don't know. It can be very difficult to know how future weather hazards will change in the future. Let's just assume the answer is yes for now; better safe than sorry!")
+            damage_flag=1
+            if his_freq == 999:
+                if fut_freq == 0:
+                    #does not occur at all
+                    damage_flag=0
+            if damage_flag==1:
+                print("\nFinally, I need to understand how this hazard can potentially damage your "+building_type.upper()+".")
+                building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)   
                 hazard_dict[h]["his_freq"]=his_freq
                 hazard_dict[h]["fut_freq"]=fut_freq
-                    
+                hazard_dict[h]["his_unsure"]=his_unsure
+                hazard_dict[h]["fut_unsure"]=fut_unsure
+        else:
+            fut_quest="\nWhat about in the future? Do you think your "+building_type+" could experience "+h.upper() + " events because of climate change or other factors? (Y=yes, N=no, U=unsure)"
+            emerging=yes_or_no_unsure(fut_quest)
+            his_freq=999  #code to note that this hazard does occur historically
+            if emerging != 0:
+                hazard_dict[h]=master_hazard_dict[h]
+                while emerging == 2:
+                    resource_help(h,hazard_dict)
+                    emerging=yes_or_no_unsure("I'll ask my question one more time: " + fut_quest)
+                    if emerging == 2:
+                        emerging=1
+                        fut_unsure=1
+                        print("\nThat's okay if you still don't know. It can be very difficult to know how future weather hazards will change in the future. Let's just assume the answer is yes for now; better safe than sorry!")
+                    fut_freq=emerging
+                if emerging == 1:
+                    fut_freq=emerging
+                    print("\nI need to understand how this hazard can potentially damage your "+building_type+".")
+                    building_component_dict=update_componentwise_hazard_list(h,building_component_dict,do_vulnerability_ranking)
+                    hazard_dict[h]["his_freq"]=his_freq
+                    hazard_dict[h]["fut_freq"]=fut_freq
+                    hazard_dict[h]["his_unsure"]=his_unsure
+                    hazard_dict[h]["fut_unsure"]=fut_unsure 
             
     else:
         print(screen_clear)
@@ -361,48 +424,6 @@ for h in master_hazard_dict.keys():
                 break
 print(screen_clear)
 
-#%%
-#REVISIT ITEMS THE USER INDICATED THEY WERE UNSURE ABOUT...
-urls=[]
-for h in hazard_dict:
-    if hazard_dict[h]["his_freq"]==0 or hazard_dict[h]["fut_freq"]==2:  #confusingly, a his_freq value of 0 mean "unsure" and a fut_freq value of 2 means "unsure"... gotta fix later
-        print(screen_clear)
-        if hazard_dict[h]["his_freq"]==0:
-            print("You indicated earlier that you were unsure if your "+building_type.upper()+" is HISTORICALLY exposed to periodic "+h.upper()+" events.")
-        if hazard_dict[h]["fut_freq"]==2:
-            print("You indicated earlier that you were unsure if "+ h.upper() + " events are projected to become more or less frequent in the FUTURE.")
-        if h.upper != "OTHER":
-            print("\nHere's some context for considering shifts in "+h.upper()+" due to climate change\n")
-            print(hazard_dict[h]["direction_statement"])
-            print(hazard_dict[h]["direction_confidence"])
-            print(hazard_dict[h]["magnitude_confidence"])
-            print("\nIn light of this context, here are some resources that I think could help you develop better understanding of changes to "+h.upper()+" impacts to your "+building_type.upper()+":")
-        if hazard_dict[h]["resources"]: #if there is actually a dictionary of resources available, proceed -
-            for resource,resource_details in hazard_dict[h]["resources"].items():
-                print("\n")
-                print("    --->Resource: "+resource.upper()+"<---")
-                print("    Information on "+h.upper()+" is available from "+resource_details["source"]+".")
-                print("    This "+resource_details["type"]+" "+resource_details["description"])
-                if resource_details["source"]=="ClimateData.ca":
-                    if yes_or_no("    Would you like me to open a map in your web browser, where you can access data for your location for different future scenarios?"):
-                        urls.append(resource_details["URL"]+str(latitude)+","+str(longitude)+",12&geo-select=&var="+resource_details["var"]+"&var-group="+resource_details["group"]+"&mora="+resource_details["season"]+"&rcp=rcp85&decade="+str(decade)+"s&sector=")
-                elif resource_details["source"]=="The Climate Resilient Buildings and Core Public Infrastructure Project":
-                    location=CRBCPI_data["+0.5C"]["Location"][np.squeeze(CRBCPI_i)]
-                    proximity="{x:.0f}".format(x=np.squeeze(CRBCPI_distance)*6378.) # convert distance from radians to kilometers, format for rounded-value printing
-                    print("    In addition to regional information, it appears there is data available for "+location +", around "+proximity+" km away from your  site.")
-                    if yes_or_no("    Would you like me to open the CRBCPI report section on "+resource+", where you can read more about how to use this information?"):
-                        urls.append(resource_details["URL"])
-                else:
-                    if yes_or_no("    Would you like me to open a website where you can read more about this?"):
-                        urls.append(resource_details["URL"])
-        else:
-            print("    Sorry, I don't have any information for: "+h.upper()+" quite yet.  Please give the CCCS Service Desk a call (1-833-517-0376) to request some one-on-one help!")
-            if yes_or_no("    Would you like me to open the CCCS Service Desk website?"):   
-                urls.append("https://climate-change.canada.ca/support-desk/Index")
-        print(" \n")
-
-for url in set(urls): #Open all urls collected from above.  'set' trims this list down to unique urls.
-    webbrowser.open(url,new=0,autoraise=False)
 
 # %% 
 
@@ -440,28 +461,39 @@ if do_vulnerability_ranking:
         summary_statement=""
         components_impacted = ""
         #historical statement
-        if hazard_dict[h]["his_freq"] != 0:
-            if hazard_dict[h]["his_freq"] == 1: 
-                his_choice ="frequenly, potentially multiple times per year"
-            elif hazard_dict[h]["his_freq"] == 2:
-                his_choice="frequently, approximatley once per year"
-            elif hazard_dict[h]["his_freq"] == 3:
-                his_choice="roughly once every 2 to 5 years"
-            elif hazard_dict[h]["his_freq"] == 4:
-                his_choice="relatively infrequently, roughly once every 5 to 10 years"
-            elif hazard_dict[h]["his_freq"] == 5:
-                his_choice="infrequently, less than once every 10 years"
-            summary_statement+=(str(j) + ". Based on your experience, " + h.upper() + " events occur " + his_choice + ".")
-        elif hazard_dict[h]["his_freq"] == 0:
-            summary_statement+=(str(j) + ". You indicated your were unsure if " + h.upper() + " occurs historically in your region. I hope the resources I supplied you with helped." )
+        if hazard_dict[h]["his_unsure"] == 0:
+            if hazard_dict[h]["his_freq"] != 999:
+                if hazard_dict[h]["his_freq"] == 1: 
+                    his_choice ="frequenly, potentially multiple times per year"
+                elif hazard_dict[h]["his_freq"] == 2:
+                    his_choice="frequently, approximatley once per year"
+                elif hazard_dict[h]["his_freq"] == 3:
+                    his_choice="roughly once every 2 to 5 years"
+                elif hazard_dict[h]["his_freq"] == 4:
+                    his_choice="relatively infrequently, roughly once every 5 to 10 years"
+                elif hazard_dict[h]["his_freq"] == 5:
+                    his_choice="infrequently, less than once every 10 years"
+                summary_statement+=(str(j) + ". Based on your experience, " + h.upper() + " events occur " + his_choice + ".")
+            elif hazard_dict[h]["his_freq"] == 0:
+                summary_statement+=(str(j) + ". You indicated your were unsure if " + h.upper() + " occurs historically in your region. I hope the resources I supplied you with helped." )
+            elif hazard_dict[h]["his_freq"] == 999:
+                summary_statement+=(str(j) + ". You indicated that, historically, " + h.upper() + " events do not occur in your region.")
+        else:
+            summary_statement+=(str(j) + ". You indicated your were unsure if " + h.upper() + " occurs historically in your region, even after reviewing the resources I had on file." )
+        
         #future statement
-        if hazard_dict[h]["fut_freq"] == 0:
-            summary_statement+=(" You indicated too that, based on what you've read or heard, " + h.upper() + " events are not likely to occur more frequently in the future.")
-        elif hazard_dict[h]["fut_freq"] == 1:
-            summary_statement+=(" Importantly, you indicated too that " + h.upper() + " events are likely to occur more frequenlty in the coming decades due to climate change.")
-        elif hazard_dict[h]["fut_freq"] ==2:
-            summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped, but its all too often that we don't have all the answers about future hazards. Don't let this stop you.")
-
+        if hazard_dict[h]["fut_unsure"] == 0:
+            if hazard_dict[h]["fut_freq"] == 0:
+                summary_statement+=(" You indicated too that, based on what you've read or heard, " + h.upper() + " events are not likely to occur more frequently in the future.")
+            elif hazard_dict[h]["fut_freq"] == 1:
+                if hazard_dict[h]["his_freq"] != 999:
+                    summary_statement+=(" Importantly, you indicated too that " + h.upper() + " events are likely to occur more frequenlty in the coming decades due to climate change.")
+                else:
+                    summary_statement+=(" However, you then told me that " + h.upper() + " events could become an emerging hazard in the future due to climate change.")
+            elif hazard_dict[h]["fut_freq"] ==2:
+                summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped, but its all too often that we don't have all the answers about future hazards. Don't let this stop you.")
+        else:
+            summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped a bit, but its all too often that we don't have all the answers about future hazards. Don't let this stop you; proactive action in the face of uncertainty is key.")
         #sloppy, I know... pre-loop thorugh the dict to simply count the number of matching items. So I can do grammar below...
         c=0        
         for component,per_component_hazard_dict in building_component_dict.items():
@@ -473,10 +505,18 @@ if do_vulnerability_ranking:
             for rankval in per_component_hazard_dict["hazards"].items():
                 if rankval[0]==h:
                     cc=cc+1
-                    if cc < c:
-                        components_impacted += component + ", "    
-                    else:
-                        components_impacted += "and " + component
+                    if c > 2:  #list need commas
+                        if cc < c:
+                            components_impacted += component + ", "    
+                        else:
+                            components_impacted += "and " + component
+                    elif c == 2:  #list doesn't need a comma, just an and
+                        if cc < c:
+                            components_impacted += component
+                        else:
+                            components_impacted += "and " + component
+                    elif c == 1: #list only has one component, no comma and ands required ;)
+                        components_impacted+=component
                     
         if components_impacted == "":
             summary_statement+= (" I thought it was interesting to note that " + h.upper() + " events do not seem to impact your " + building_type.upper()+"'s components.")
@@ -514,48 +554,6 @@ print("\nIt might make sense to focus most on these hazards during data gatherin
 input ("Press ENTER to continue")
 print(screen_clear)
 
-# %%
-'''
-print("I've found some specific climate information and data resources that are likely to help you, based on the hazards that are important for your building.\n")
-urls=[]
-for hazard,_ in l_sorted:
-    print(" \n")
-    print('********'+hazard.upper()+"********")
-    if hazard.upper != "OTHER":
-        print("Here's some context for considering shifts in "+hazard+" due to climate change\n")
-        print(hazard_dict[hazard]["direction_statement"])
-        print(hazard_dict[hazard]["direction_confidence"])
-        print(hazard_dict[hazard]["magnitude_confidence"])
-        print("In light of this context, here are some resources that I think could help you develop better understanding of changes to "+hazard+" impacts to your building:")
-    if hazard_dict[hazard]["resources"]: #if there is actually a dictionary of resources available, proceed -
-        for resource,resource_details in hazard_dict[hazard]["resources"].items():
-            print("\n")
-            print("    --->Resource: "+resource.upper()+"<---")
-            print("    Information on "+hazard+" is available from "+resource_details["source"]+".")
-            print("    This "+resource_details["type"]+" "+resource_details["description"])
-            if resource_details["source"]=="ClimateData.ca":
-                if yes_or_no("    Would you like me to open a map in your web browser, where you can access data for your location for different future scenarios?"):
-                    urls.append(resource_details["URL"]+str(latitude)+","+str(longitude)+",12&geo-select=&var="+resource_details["var"]+"&var-group="+resource_details["group"]+"&mora="+resource_details["season"]+"&rcp=rcp85&decade="+str(decade)+"s&sector=")
-            elif resource_details["source"]=="The Climate Resilient Buildings and Core Public Infrastructure Project":
-                location=CRBCPI_data["+0.5C"]["Location"][np.squeeze(CRBCPI_i)]
-                proximity="{x:.0f}".format(x=np.squeeze(CRBCPI_distance)*6378.) # convert distance from radians to kilometers, format for rounded-value printing
-                print("    In addition to regional information, it appears there is data available for "+location +", around "+proximity+" km away from your  site.")
-                if yes_or_no("    Would you like me to open the CRBCPI report section on "+resource+", where you can read more about how to use this information?"):
-                    urls.append(resource_details["URL"])
-            else:
-                if yes_or_no("    Would you like me to open a website where you can read more about this?"):
-                    urls.append(resource_details["URL"])
-    else:
-        print("    Sorry, I don't have any information for: "+hazard+" quite yet.  Please give the CCCS Service Desk a call (1-833-517-0376) to request some one-on-one help!")
-        if yes_or_no("    Would you like me to open the CCCS Service Desk website?"):   
-            urls.append("https://climate-change.canada.ca/support-desk/Index")
-    print(" \n")
-    
-for url in set(urls): #Open all urls collected from above.  'set' trims this list down to unique urls.
-    webbrowser.open(url,new=0,autoraise=False)
-      
-#TODO: Improve this closing guidance.
-'''
 # %%
 
 input("Press ENTER to continue")
