@@ -331,12 +331,12 @@ def resource_help(h, hazard_dict):
                 
 
 for h in master_hazard_dict.keys():
+    his_freq=0
+    fut_freq=0
+    his_unsure=0
+    fut_unsure=0
     if h != "other":
         print(screen_clear)
-        his_freq=0
-        fut_freq=0
-        his_unsure=0
-        fut_unsure=0
         #draw_stuff(h)
         print(h.upper())
         print("---------------------------------------------------------------------------")
@@ -484,16 +484,18 @@ if do_vulnerability_ranking:
         #future statement
         if hazard_dict[h]["fut_unsure"] == 0:
             if hazard_dict[h]["fut_freq"] == 0:
-                summary_statement+=(" You indicated too that, based on what you've read or heard, " + h.upper() + " events are not likely to occur more frequently in the future.")
+                summary_statement+=(" However, you indicated too that, based on what you've read or heard, " + h.upper() + " events are NOT likely to occur more frequently in the future. To me, this reads: if you are well adapted to this hazard now, you might not need to do anything extra to account for " + h.upper() + " events in the future. But certaintly don't quote me on that!")
             elif hazard_dict[h]["fut_freq"] == 1:
                 if hazard_dict[h]["his_freq"] != 999:
-                    summary_statement+=(" Importantly, you indicated too that " + h.upper() + " events are likely to occur more frequenlty in the coming decades due to climate change.")
+                    summary_statement+=(" Critically, you then indicated that " + h.upper() + " events are likely to occur MORE frequenlty in the coming decades due to climate change.")
                 else:
                     summary_statement+=(" However, you then told me that " + h.upper() + " events could become an emerging hazard in the future due to climate change.")
             elif hazard_dict[h]["fut_freq"] ==2:
                 summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped, but its all too often that we don't have all the answers about future hazards. Don't let this stop you.")
         else:
             summary_statement+=(" You indicated to me earlier that you were unsure whether " +h.upper()+" events will occur more frequently in the future. I hope the resources I supplied you with helped a bit, but its all too often that we don't have all the answers about future hazards. Don't let this stop you; proactive action in the face of uncertainty is key.")
+       
+        
         #sloppy, I know... pre-loop thorugh the dict to simply count the number of matching items. So I can do grammar below...
         c=0        
         for component,per_component_hazard_dict in building_component_dict.items():
@@ -504,24 +506,35 @@ if do_vulnerability_ranking:
         for component,per_component_hazard_dict in building_component_dict.items():
             for rankval in per_component_hazard_dict["hazards"].items():
                 if rankval[0]==h:
+                    ranking=building_component_dict[component]["hazards"][h]
+                    if ranking < 3:
+                        damage="slight"
+                    if ranking >= 3:
+                        if ranking <= 5:
+                            damage="light to medium"
+                    if ranking > 5:
+                        if ranking <= 7:
+                            damage="medium to heavy"
+                    if ranking > 7:
+                        damage="potentially catastrophic"
                     cc=cc+1
                     if c > 2:  #list need commas
                         if cc < c:
-                            components_impacted += component + ", "    
+                            components_impacted += damage + " damage to " + component + ", "    
                         else:
-                            components_impacted += "and " + component
+                            components_impacted += "and " + damage + " damage to " + component
                     elif c == 2:  #list doesn't need a comma, just an and
                         if cc < c:
-                            components_impacted += component
+                            components_impacted += damage + " damage to " + component
                         else:
-                            components_impacted += "and " + component
+                            components_impacted += " and " + damage + " damage to " + component
                     elif c == 1: #list only has one component, no comma and ands required ;)
-                        components_impacted+=component
+                        components_impacted+=damage + " damage to " + component
                     
         if components_impacted == "":
-            summary_statement+= (" I thought it was interesting to note that " + h.upper() + " events do not seem to impact your " + building_type.upper()+"'s components.")
+            summary_statement+= (" I thought it was interesting to note that " + h.upper() + " events do not seem to impact your " + building_type.upper()+"'s components, so maybe this insn't a hazard you should focus on this time around.")
         else:
-            summary_statement+=(" Importantly, " + h.upper() + " events can potentially impact your " + building_type.upper()+ " by damaging " + components_impacted + ".")
+            summary_statement+=(" Importantly, " + h.upper() + " events can potentially impact your " + building_type.upper()+ " by causing " + components_impacted + ".")
 
         print("\n"+summary_statement)
         
@@ -540,13 +553,10 @@ if do_vulnerability_ranking:
                     flag = 1
     print("\nIt might make sense to focus most on understanding climate change risks to the components nearer the top of this list during your building planning work.")
 
-# %% 
-# Rank hazards by # of times they are mentioned as component hazards.  Display top hazards.
-
 l_sorted=aggregate_hazard_list.most_common()
 
 max_len=min(3,len(l_sorted))
-print("\nFinally, the top climate hazards that impact the most components of building appear to be:\n")
+print("\nFinally, the top climate hazards that potentially impact the most components of you " + building_type.upper()+ " appear to be (in no specific order):\n")
 for h in range(max_len):
     print("->"+l_sorted[h][0])
 print("\nIt might make sense to focus most on these hazards during data gathering for your building planning work.\n")
@@ -555,9 +565,6 @@ input ("Press ENTER to continue")
 print(screen_clear)
 
 # %%
-
-input("Press ENTER to continue")
-print(screen_clear)
 
 print("\n")
 print("STEP 5: NEXT STEPS")
